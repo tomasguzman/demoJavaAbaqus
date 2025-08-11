@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>Evolución del Portafolio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; }
+    .row { display: grid; gap: 24px; grid-template-columns: 1fr; }
+    @media (min-width: 1000px) { .row { grid-template-columns: 1fr 1fr; } }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
+    .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
+    label { display:block; font-size: 12px; color: #374151; margin-bottom: 4px; }
+    input, select, button { padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db; }
+    button { cursor: pointer; }
+    h2 { margin: 0 0 8px 0; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Evolución del Portafolio</h1>
+
+  <div class="controls">
+    <div>
+      <label for="inicio">Fecha inicio</label>
+      <input id="inicio" type="date" value="2022-02-15">
+    </div>
+    <div>
+      <label for="fin">Fecha fin</label>
+      <input id="fin" type="date" value="2023-02-16">
+    </div>
+    <div>
+      <label for="portafolio">Portafolio</label>
+      <select id="portafolio">
+       
+      </select>
+    </div>
+    <div>
+      <button id="btnCargar">Cargar</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2>Valor total del portafolio (V_t)</h2>
+      <canvas id="vtChart" height="110"></canvas>
+    </div>
+    <div class="card">
+      <h2>Peso por activo (w_{i,t}) — Stacked Area</h2>
+      <canvas id="weightsChart" height="110"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const btn = document.getElementById('btnCargar');
+    const sel = document.getElementById('portafolio');
+    const inputInicio = document.getElementById('inicio');
+    const inputFin = document.getElementById('fin');
+
+    let vtChart, weightsChart;
+
+    function buildPortfolioOptionsFromResponse(json) {
+      // Toma la primera fecha con datos y usa sus claves de portafolios
+      const firstDateKey = Object.keys(json)[0];
+      if (!firstDateKey) return;
+      const portfolios = Object.keys(json[firstDateKey]); 
+      sel.innerHTML = "";
+      for (const p of portfolios) {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        sel.appendChild(opt);
+      }
+    }
+
+    function makeLineChart(ctx, labels, data) {
+      if (vtChart) vtChart.destroy();
+      vtChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'V_t',
+            data,
+            tension: 0.25,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: true } },
+          scales: {
+            x: { display: true, ticks: { autoSkip: true, maxTicksLimit: 12 } },
+            y: { display: true }
+          }
+        }
+      });
+    }
+
+    function randomColor(seed) {
+      let h = 0;
+      for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360;
+      return `hsl(${h}, 60%, 60%)`;
+    }
+
+    function makeStackedAreaChart(ctx, labels, seriesMap) {
+      if (weightsChart) weightsChart.destroy();
+
+      const datasets = Object.keys(seriesMap).map((assetName) => {
+        return {
+          label: assetName,
+          data: seriesMap[assetName],
+          fill: true,
+          stack: 'weights',
+          borderColor: randomColor(assetName),
+          backgroundColor: randomColor(assetName),
+          tension: 0.25
+        };
+      });
+
+      weightsChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: true } },
+          scales: {
+            x: { stacked: true, ticks: { autoSkip: true, maxTicksLimit: 12 } },
+            y: { stacked: true, suggestedMin: 0, suggestedMax: 1 }
+          }
+        }
+      });
+    }
+
+    async function cargar() {
+      const inicio = inputInicio.value;
+      const fin = inputFin.value;
+      const url = `/api/valores?fecha_inicio=${inicio}&fecha_fin=${fin}`;
+
+      const res = await fetch(url);
+      if (!res.ok) {
+        alert('Error al consultar la API');
+        return;
+      }
+      const json = await res.json();
+
+      if (!sel.options.length) {
+        buildPortfolioOptionsFromResponse(json);
+      }
+      const selectedPortfolio = sel.value || Object.keys(json[Object.keys(json)[0]])[0];
+
+      const labels = [];
+      const vtValues = [];
+
+      const weightsSeries = {};
+
+      for (const fecha of Object.keys(json)) {
+        const dayData = json[fecha][selectedPortfolio];
+        if (!dayData) continue;
+        labels.push(fecha);
+        vtValues.push(dayData["V_t"]);
+
+        const weights = dayData["w_i_t"] || {};
+        for (const [asset, w] of Object.entries(weights)) {
+          if (!weightsSeries[asset]) weightsSeries[asset] = [];
+          weightsSeries[asset].push(w);
+        }
+
+        for (const assetName of Object.keys(weightsSeries)) {
+          if (weightsSeries[assetName].length < labels.length) {
+            weightsSeries[assetName].push(null);
+          }
+        }
+      }
+
+      makeLineChart(document.getElementById('vtChart').getContext('2d'), labels, vtValues);
+      makeStackedAreaChart(document.getElementById('weightsChart').getContext('2d'), labels, weightsSeries);
+    }
+
+    btn.addEventListener('click', cargar);
+
+
+    window.addEventListener('DOMContentLoaded', cargar);
+  </script>
+</body>
+</html>

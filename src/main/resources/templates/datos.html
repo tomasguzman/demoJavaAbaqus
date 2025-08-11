@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Datos del sistema</title>
+</head>
+<body>
+    <h1>Cantidades</h1>
+    <table border="1">
+        <tr>
+            <th>Fecha</th>
+            <th>Activo</th>
+            <th>Portafolio</th>
+            <th>Cantidad</th>
+        </tr>
+        <tr th:each="c : ${cantidades}">
+            <td th:text="${c.fecha}">fecha</td>
+            <td th:text="${c.activo.nombre}">activo</td>
+            <td th:text="${c.portafolio.nombre}">portafolio</td>
+            <td th:text="${c.cantidad}">cantidad</td>
+        </tr>
+    </table>
+
+    <h1>Weights</h1>
+    <table border="1">
+        <tr>
+            <th>Fecha</th>
+            <th>Activo</th>
+            <th>Portafolio</th>
+            <th>Weight</th>
+        </tr>
+        <tr th:each="w : ${weights}">
+            <td th:text="${w.fecha}">fecha</td>
+            <td th:text="${w.activo.nombre}">activo</td>
+            <td th:text="${w.portafolio.nombre}">portafolio</td>
+            <td th:text="${w.valor}">valor</td>
+        </tr>
+    </table>
+
+    <h1>Portafolios</h1>
+    <table border="1">
+        <tr>
+            <th>Nombre</th>
+            <th>Valor Inicial</th>
+        </tr>
+        <tr th:each="p : ${portafolios}">
+            <td th:text="${p.nombre}">nombre</td>
+            <td th:text="${p.valorInicial}">valorInicial</td>
+        </tr>
+    </table>
+</body>
+</html>
