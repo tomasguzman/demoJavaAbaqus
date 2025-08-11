@@ -21,7 +21,10 @@ http://localhost:8080
 
 ## Endpoints:
 http://localhost:8080/datos (Visualizacion de datos, cantidades iniciales entre ellos.)
+
 http://localhost:8080/api/valores?fecha_inicio=2022-02-15&fecha_fin=2022-03-01 (Retorna un ejemplo puntual de la data procesada en la vista de graficos)
+
 http://localhost:8080/charts (Vista de graficos del bonus 1)
+
 http://localhost:8080/transacciones (Vista de compra y venta del bonus 2)
 
